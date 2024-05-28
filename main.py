@@ -49,7 +49,7 @@ q0 = 0.5  # starting position (radian)
 
 L, m, g = 0.5, 1, 10
 Y0 = 0.3
-maxTime = 4
+maxTime = 7
 logTime = np.arange(0.0, maxTime, dt)
 jointIndices = [1,3,5]
 eefLinkIdx = 6
@@ -86,21 +86,14 @@ for _ in range(100):
     p.stepSimulation()
 p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetVelocities=[0, 0, 0],
                             controlMode=p.VELOCITY_CONTROL, forces=[0, 0, 0])
-veloc1, veloc2, veloc3 = [], [], []
 prev_vel = 0
-a1, a2 = [], []
 for t in range(len(logTime)):
     jStates = p.getJointStates(boxId, jointIndices=jointIndices)
     jPos = [state[0] for state in jStates]
     q1, q2 = jPos[0], jPos[1]
-    a1.append(q1)
-    a2.append(jPos[2])
     jVel = [state[1] for state in jStates]
     vel1, vel2, vel3 = jVel[0], jVel[1], jVel[2]
     derivative = (vel3 - prev_vel)/dt
-    veloc1.append(vel1)
-    veloc2.append(vel2)
-    veloc3.append(vel3)
     C = np.array([[- 2 * m * L ** 2 * np.sin(q2) * vel1 * vel2 - m * L ** 2 * np.sin(q2) * vel2 ** 2],
                   [m * L ** 2 * vel1 ** 2 * np.sin(q2)],
                   [0]])
@@ -116,16 +109,6 @@ for t in range(len(logTime)):
     p.stepSimulation()
     prev_vel = vel3
     #time.sleep(dt)
-
-print(derivative)
-plt.plot(logTime, veloc1, label=r'$\dot{\theta_1}$', color='orange')
-plt.plot(logTime, veloc2, label=r'$\dot{\theta_2}$', color='b')
-plt.plot(logTime, veloc3, label=r'$\dot{\theta_3}$', color='k')
-plt.xlabel('t, s')
-plt.ylabel(r'$\dot\theta$, m/s')
-plt.grid()
-plt.legend()
-plt.show()
 
 
 #Валидация движения в декартову точку в скоростном управлении
@@ -143,17 +126,13 @@ dphi = 0.5
 # des_x = 0.55
 # des_z = 1
 # dphi = 0.2
-xarr, zarr, phiarr = [], [], []
 for i in range(len(logTime)):
     states = p.getJointStates(bodyUniqueId=boxId, jointIndices=jointIndices)
     angle = [state[0] for state in states]
     q1, q2, phi = angle[0], angle[1], angle[2]
-    phiarr.append(phi)
     linkState = p.getLinkState(boxId, linkIndex=4)
     xSim2 = linkState[0][0]
-    xarr.append(xSim2)
     zSim2 = linkState[0][2]
-    zarr.append(zSim2)
     J = np.array([[-L * np.cos(q1) - L * np.cos(q1 + q2), -L * np.cos(q1 + q2), 0],
                   [L * np.sin(q1) + L * np.sin(q1 + q2), L * np.sin(q1 + q2), 0],
                   [1, 1, 1]])
@@ -161,30 +140,6 @@ for i in range(len(logTime)):
     p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetVelocities=[w[0,0], w[1,0], w[2,0]], controlMode=p.VELOCITY_CONTROL)
     p.stepSimulation()
     #time.sleep(dt)
-fig, axs = plt.subplots(3, 1)
-print(q1, q2, phi)
-axs[0].plot(logTime, xarr, 'k')
-axs[0].axhline(y=des_x, color='r', linestyle='--')
-axs[0].set_title('X')
-axs[0].grid()
-axs[0].set_xlabel('t, s')
-axs[0].set_ylabel('x, m')
-
-axs[1].plot(logTime, zarr, 'k')
-axs[1].axhline(y=des_z, color='r', linestyle='--')
-axs[1].set_title('Z')
-axs[1].grid()
-axs[1].set_xlabel('t, s')
-axs[1].set_ylabel('z, m')
-
-axs[2].plot(logTime, phiarr, 'k')
-axs[2].axhline(y=dphi, color='r', linestyle='--')
-axs[2].set_title(r'$\phi$ ')
-axs[2].grid()
-axs[2].set_xlabel('t, s')
-axs[2].set_ylabel(r'$\phi$, rad')
-
-plt.show()
 
 
 #Визуальное позиционирование
@@ -231,8 +186,6 @@ camCount = 0
 k = 300
 L0 = computeInterMatrix(Y0, sd0)
 L0T = np.linalg.inv(L0.T @ L0) @ L0.T
-
-logs0_x, logs0_z, logPosx, logPosz, logPosf = [], [], [], [], []
 w = np.zeros((3, 1))
 for t in range(len(logTime)):
     p.stepSimulation()
@@ -248,8 +201,6 @@ for t in range(len(logTime)):
         s0 = np.array([(ss - IMG_HALF) / IMG_HALF for ss in s0])
         s0_x = s0[::2]
         s0_z = s0[1::2]
-        logs0_x.append(s0_x)
-        logs0_z.append(s0_z)
         e = s0 - sd0
         coef = np.diag([1, 1, 1.5])
         w = -coef @ L0T @ e
@@ -258,9 +209,6 @@ for t in range(len(logTime)):
     jVel = [state[1] for state in jStates]
     q1, q2 = jPos[0], jPos[1]
     vel1, vel2, vel3 = jVel[0], jVel[1], jVel[2]
-    logPosf.append(jPos[2])
-    logPosx.append(p.getLinkState(bodyUniqueId=boxId, linkIndex=6)[0][0])
-    logPosz.append(p.getLinkState(bodyUniqueId=boxId, linkIndex=6)[0][2])
     J = np.array([[-L * np.cos(q1) - L * np.cos(q1 + q2), -L * np.cos(q1 + q2), 0],
                   [L * np.sin(q1) + L * np.sin(q1 + q2), L * np.sin(q1 + q2), 0],
                   [1, 1, 1]])
@@ -283,44 +231,6 @@ for t in range(len(logTime)):
                                 forces=[u[0, 0], u[1, 0], u[2, 0]])
     #time.sleep(dt)
 
-plt.figure(figsize=(12, 6))
-plt.subplot(1, 2, 1)
-plt.scatter(logs0_x, logs0_z, s=2, label='trajecory')
-plt.plot(sd0_x, sd0_z, 'r', linewidth=3, label='desired position')
-logs0_x = np.concatenate((logs0_x[0], [logs0_x[0][0]]), axis=0)
-logs0_z = np.concatenate((logs0_z[0], [logs0_z[0][0]]), axis=0)
-plt.plot(logs0_x, logs0_z, linestyle='--', linewidth=3, label='starting position')
-plt.legend(loc='upper right')
-plt.xlabel('ImgX'), plt.ylabel('ImgZ')
-plt.grid()
-
-plt.subplot(3, 2, 2)
-plt.plot(logTime, logPosx, 'k')
-plt.axhline(y=xd, color='r', linestyle='--')
-plt.title('X')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel('x, m')
-
-plt.subplot(3, 2, 4)
-plt.plot(logTime, logPosz, 'k')
-plt.axhline(y=zd, color='r', linestyle='--')
-plt.title('Z')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel('z, m')
-
-plt.subplot(3, 2, 6)
-plt.plot(logTime, logPosf, 'k')
-plt.axhline(y=qd, color='r', linestyle='--')
-plt.title(r'$\phi$ ')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel(r'$\phi$, rad')
-
-plt.show()
-
-
 # go to the starting position
 
 #p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetPositions=[-0.1, -np.pi/2 + 0.1, 0.1], controlMode=p.POSITION_CONTROL)
@@ -332,7 +242,6 @@ p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetVe
 idx = 1
 camCount = 0
 k = 300
-logs0_x, logs0_z, logPosx, logPosz, logPosf = [], [], [], [], []
 w = np.zeros((3, 1))
 for t in range(len(logTime)):
     p.stepSimulation()
@@ -348,8 +257,6 @@ for t in range(len(logTime)):
         s0 = np.array([(ss - IMG_HALF) / IMG_HALF for ss in s0])
         s0_x = s0[::2]
         s0_z = s0[1::2]
-        logs0_x.append(s0_x)
-        logs0_z.append(s0_z)
         L0 = computeInterMatrix(Y0, s0)
         L0T = np.linalg.inv(L0.T @ L0) @ L0.T
         e = s0 - sd0
@@ -360,13 +267,9 @@ for t in range(len(logTime)):
     jVel = [state[1] for state in jStates]
     q1, q2 = jPos[0], jPos[1]
     vel1, vel2, vel3 = jVel[0], jVel[1], jVel[2]
-    logPosf.append(jPos[2])
-    logPosx.append(p.getLinkState(bodyUniqueId=boxId, linkIndex=6)[0][0])
-    logPosz.append(p.getLinkState(bodyUniqueId=boxId, linkIndex=6)[0][2])
     J = np.array([[-L * np.cos(q1) - L * np.cos(q1 + q2), -L * np.cos(q1 + q2), 0],
                   [L * np.sin(q1) + L * np.sin(q1 + q2), L * np.sin(q1 + q2), 0],
                   [1, 1, 1]])
-
     dq = (np.linalg.inv(J) @ w).flatten()[[1, 0, 2]]
     dq[0] = -dq[0]
     dq[2] = -dq[2]
@@ -386,40 +289,4 @@ for t in range(len(logTime)):
     #time.sleep(dt)
 p.disconnect()
 
-plt.figure(figsize=(12, 6))
-plt.subplot(1, 2, 1)
-plt.scatter(logs0_x, logs0_z, s=2, label='trajecory')
-plt.plot(sd0_x, sd0_z, 'r', linewidth=3, label='desired position')
-logs0_x = np.concatenate((logs0_x[0], [logs0_x[0][0]]), axis=0)
-logs0_z = np.concatenate((logs0_z[0], [logs0_z[0][0]]), axis=0)
-plt.plot(logs0_x, logs0_z, linestyle='--', linewidth=3, label='starting position')
-plt.legend(loc='upper right')
-plt.xlabel('ImgX'), plt.ylabel('ImgZ')
-plt.grid()
-
-plt.subplot(3, 2, 2)
-plt.plot(logTime, logPosx, 'k')
-plt.axhline(y=xd, color='r', linestyle='--')
-plt.title('X')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel('x, m')
-
-plt.subplot(3, 2, 4)
-plt.plot(logTime, logPosz, 'k')
-plt.axhline(y=zd, color='r', linestyle='--')
-plt.title('Z')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel('z, m')
-
-plt.subplot(3, 2, 6)
-plt.plot(logTime, logPosf, 'k')
-plt.axhline(y=qd, color='r', linestyle='--')
-plt.title(r'$\phi$ ')
-plt.grid()
-plt.xlabel('t, s')
-plt.ylabel(r'$\phi$, rad')
-
-plt.show()
 
